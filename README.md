@@ -1,6 +1,8 @@
 # Code Review Room
 
-A real-time collaborative code review application where multiple developers join a room, edit code together with conflict-free sync (Yjs / CRDT), and request an AI-powered review whose comments stream live to everyone in the room.
+A real-time collaborative code review app. Multiple developers join a room, edit code together with conflict-free sync (Yjs / CRDT), and request an AI review whose comments stream live to everyone in the room.
+
+**Stack:** React 18 (Vite), Monaco Editor, Yjs, Node.js, Express, Socket.io, MongoDB (Mongoose), Google Gemini.
 
 ## Architecture
 
@@ -14,113 +16,102 @@ A real-time collaborative code review application where multiple developers join
 └────────────┘            │  └─────┬─────┘  └──────┬──────┘  │
                           │        │               │          │
                           │  ┌─────▼───────────────▼──────┐  │
-                          │  │        MongoDB              │  │
+                          │  │          MongoDB            │  │
                           │  │  Users, Rooms, Reviews      │  │
-                          │  └────────────────────────────-┘  │
-                          │         :5000                      │
+                          │  └─────────────────────────────┘  │
+                          │             :5000                  │
                           └───────────────────────────────────┘
 ```
 
 ## Features
 
-- **Real-time collaborative editing** — Yjs CRDT over Socket.io, multi-cursor with name labels
-- **Room-based workflow** — create a room, share a 6-character code, join instantly
-- **AI code review** — Google Gemini streams review comments live to all participants
-- **Mock review mode** — works without an API key using heuristic analysis
-- **Presence awareness** — see who is online with colored avatars and cursors
-- **Comment management** — accept / dismiss comments, synced in real-time
-- **Persistent state** — documents and reviews survive server restarts via MongoDB
-- **Dark theme** — modern slate/indigo UI with no external CSS frameworks
+- **Real-time collaborative editing**: Yjs CRDT over Socket.io, with named multi-cursors
+- **Rooms**: create a room, share a 6-character code, join instantly
+- **AI code review**: Gemini streams review comments live to all participants
+- **Mock review mode**: works without an API key using simple heuristics
+- **Presence**: see who is online with colored avatars
+- **Comment management**: accept or dismiss comments, synced in real time
+- **Persistence**: documents and reviews survive server restarts via MongoDB
 
 ## Prerequisites
 
-- **Node.js 20+**
-- **MongoDB** — local instance (`mongod`) or a free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster
+- Node.js 20+
+- MongoDB: a local instance or a free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster
 
 ## Setup
 
 ```bash
-# 1. Clone the repo
-git clone <repo-url> code-review-room
-cd code-review-room
+git clone https://github.com/1shikharvarshney1/Code-Review-Room.git
+cd Code-Review-Room
 
-# 2. Install all dependencies (root + server + client)
+# Install root + server + client dependencies
 npm run install:all
 
-# 3. Configure the server environment
+# Configure the server
 cp server/.env.example server/.env
-# Edit server/.env — at minimum set MONGODB_URI and JWT_SECRET
+# Edit server/.env and set MONGODB_URI and JWT_SECRET
 
-# 4. Start in development mode
 npm run dev
 ```
 
-The client opens at **http://localhost:5173** and proxies API / WebSocket traffic to the server on port 5000.
+The client runs at http://localhost:5173 and proxies API and WebSocket traffic to the server on port 5000.
 
 ## Environment Variables
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `PORT` | No | `5000` | Server HTTP port |
-| `MONGODB_URI` | **Yes** | — | MongoDB connection string |
-| `JWT_SECRET` | **Yes** | — | Secret for signing JWTs |
+| `PORT` | No | `5000` | Server port |
+| `MONGODB_URI` | **Yes** | none | MongoDB connection string |
+| `JWT_SECRET` | **Yes** | none | Secret for signing JWTs |
 | `CLIENT_ORIGIN` | No | `http://localhost:5173` | Allowed CORS origin |
-| `GEMINI_API_KEY` | No | _(empty = mock mode)_ | Google AI Studio API key |
-| `GEMINI_MODEL` | No | `gemini-2.5-flash` | Gemini model name |
-| `MAX_REVIEW_LINES` | No | `300` | Max lines accepted for review |
+| `GEMINI_API_KEY` | No | empty (mock mode) | Google AI Studio API key |
+| `GEMINI_MODEL` | No | `gemini-3.5-flash` | Gemini model name |
+| `MAX_REVIEW_LINES` | No | `300` | Max lines accepted per review |
 | `REVIEW_COOLDOWN_SECONDS` | No | `15` | Seconds between reviews |
 
-## Getting a Free Gemini API Key
+## Enabling the Real AI
 
-1. Go to [Google AI Studio](https://aistudio.google.com/apikey).
-2. Click **Create API key** and copy it.
-3. Paste it into `server/.env` as `GEMINI_API_KEY=your_key_here`.
-4. The app will automatically switch from mock mode to real AI reviews.
+1. Create a free key at [Google AI Studio](https://aistudio.google.com/apikey).
+2. Put it in `server/.env` as `GEMINI_API_KEY=your_key`, then restart the server.
+3. The review panel badge changes from "Mock" to "AI".
 
-### If the model name is rejected
+If you see "The configured GEMINI_MODEL is not available", set `GEMINI_MODEL` to a model your key can use (check AI Studio). If you hit a rate limit, wait about a minute.
 
-Some Gemini models rotate on the free tier. If you see _"The configured GEMINI_MODEL is not available"_:
+> **Privacy:** on the free tier, Google may use prompts to improve its products. Don't paste private or proprietary code.
 
-1. Visit [AI Studio](https://aistudio.google.com/) and check which models are marked **Free**.
-2. Update `GEMINI_MODEL` in your `.env` to match (e.g., `gemini-2.0-flash`, `gemini-1.5-flash`).
+## Using it with Two Users
 
-### Free-tier rate limits
+Login is stored in the browser, so two normal windows share one user. Use **one normal window and one incognito window** (or two different browsers):
 
-The free tier has per-minute request limits. If you hit _"AI rate limit reached"_, wait ~60 seconds and try again.
+1. Register a different user in each window.
+2. User A creates a room, User B joins with the room code.
+3. Type in both windows. Text merges without conflicts, with named cursors.
+4. Click **Request AI Review** and watch the comments stream into both windows.
 
-> **Privacy note:** On the free tier, prompts may be used by Google to improve its products. **Do not paste private or proprietary code.**
+## Socket Events
 
-## Testing Collaboration
-
-1. Open **http://localhost:5173** in a normal browser window.
-2. Open it again in an **incognito/private** window (or a different browser).
-3. Register two different users, create a room with User A, join it with User B using the room code.
-4. Type in both windows simultaneously — text merges conflict-free with named remote cursors.
-
-## Socket Event Reference
-
-### Client → Server
+### Client to Server
 
 | Event | Payload | Description |
 |---|---|---|
 | `room:join` | `{ code }` | Join a room (must be a member) |
 | `room:leave` | `{ code }` | Leave a room |
 | `yjs:sync-request` | `{ code }` | Request full document state |
-| `yjs:update` | `{ code, update }` | Send a Yjs document update |
-| `awareness:update` | `{ code, update }` | Send awareness state |
-| `review:request` | `{ code }` | Request an AI code review |
-| `comment:status` | `{ reviewId, commentId, status }` | Change comment status |
+| `yjs:update` | `{ code, update }` | Send a Yjs update |
+| `awareness:update` | `{ code, update }` | Send cursor/presence state |
+| `review:request` | `{ code }` | Request an AI review |
+| `comment:status` | `{ reviewId, commentId, status }` | Accept or dismiss a comment |
 
-### Server → Client
+### Server to Client
 
 | Event | Payload | Description |
 |---|---|---|
 | `room:joined` | `{ room, users, latestReview }` | Confirms room entry |
-| `presence:update` | `{ users }` | Updated user presence list |
+| `presence:update` | `{ users }` | Current users in the room |
 | `yjs:sync` | `{ update }` | Full document state |
 | `yjs:update` | `{ update }` | Incremental document update |
-| `awareness:update` | `{ update }` | Remote awareness state |
-| `review:started` | `{ reviewId, requestedBy, provider }` | Review has begun |
+| `awareness:update` | `{ update }` | Remote cursor state |
+| `review:started` | `{ reviewId, requestedBy, provider }` | Review began |
 | `review:comment` | `{ reviewId, comment }` | Streamed review comment |
 | `review:summary` | `{ reviewId, summary }` | Review summary |
 | `review:done` | `{ reviewId }` | Review complete |
@@ -128,10 +119,8 @@ The free tier has per-minute request limits. If you hit _"AI rate limit reached"
 | `comment:updated` | `{ reviewId, comment }` | Comment status changed |
 | `app:error` | `{ message }` | General error |
 
-## Resume Bullet Points
+## Known Limitations
 
-- Architected a real-time collaborative code review platform using **React 18**, **Express 4**, **Socket.io 4**, **Yjs 13**, **MongoDB**, and **Google Gemini**
-- Implemented **conflict-free real-time collaborative editing (CRDT)** with Yjs over Socket.io, featuring multi-user cursors, awareness, and persistent document state
-- Built a **streaming AI code review pipeline** with NDJSON parsing, rate limiting, cooldown enforcement, and graceful error handling for free-tier API constraints
-- Designed a **room-based authentication system** with JWT verification on both REST and WebSocket layers, with per-event membership validation
-- Created a **responsive dark-themed UI** with Monaco Editor, live presence indicators, streaming review comments with accept/dismiss workflow, and glyph decorations
+- Free Gemini tier has per-minute and daily limits.
+- The editor does not run code; it only reviews it.
+- Two users in two normal windows of the same browser share one login.
